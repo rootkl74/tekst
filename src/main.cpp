@@ -30,7 +30,6 @@ const char* COMMON_PASSWORD = "rootrootroot19821609";
 // Точка доступа
 const char* AP_SSID = "ClockAP";
 const char* AP_PASS = "12345678";
-const unsigned long WIFI_TIMEOUT = 10000;
 
 // Адреса EEPROM
 const int WIFI_FLAG_ADDR = 0;
@@ -80,6 +79,7 @@ int XY(int x, int y);
 void drawChar(char c, int x, uint32_t color);
 void drawCyrillicCharByIndex(int idx, int x, uint32_t color);
 int getCyrillicIndex(const char* str, size_t i);
+int getTextWidth(const char* text);
 void showTextFrame();
 void handleRoot();
 void handleSaveBrightness();
@@ -91,39 +91,129 @@ void handleWiFiSelect();
 void handleSaveWiFi();
 void saveWiFiSettings();
 bool loadWiFiSettings();
-int getTextWidth(const char* text);
 void fadeOut();
 void fadeIn();
 
-// ============ Шрифт 5x8 — цифры и символы ============
+// ============ Шрифт 5x8 — ASCII (32–90) ============
 const byte font5x8[][5] PROGMEM = {
-  {0x00, 0x00, 0x00, 0x00, 0x00}, // пробел
-  {0x00, 0x00, 0x58, 0x00, 0x00}, // !
-  {0x00, 0x00, 0x00, 0x00, 0x00}, // "
-  {0x00, 0x28, 0x7E, 0x28, 0x00}, // #
-  {0x00, 0x24, 0x5E, 0x52, 0x00}, // $
-  {0x00, 0x60, 0x50, 0x23, 0x00}, // %
-  {0x00, 0x36, 0x49, 0x26, 0x00}, // &
-  {0x00, 0x40, 0x40, 0x00, 0x00}, // '
-  {0x00, 0x3C, 0x40, 0x3C, 0x00}, // (
-  {0x00, 0x3C, 0x04, 0x3C, 0x00}, // )
-  {0x00, 0x14, 0x3E, 0x14, 0x00}, // *
-  {0x00, 0x08, 0x3E, 0x08, 0x00}, // +
-  {0x00, 0x00, 0x00, 0x40, 0x40}, // ,
-  {0x00, 0x00, 0x08, 0x08, 0x00}, // -
-  {0x00, 0x00, 0x00, 0x00, 0x60}, // .
-  {0x00, 0x20, 0x10, 0x08, 0x04}, // /
-  {0x7e, 0x81, 0x81, 0x81, 0x7e}, // 0
-  {0x00, 0x84, 0x82, 0xff, 0x80}, // 1
-  {0xe2, 0x91, 0x91, 0x91, 0x8e}, // 2
-  {0x42, 0x91, 0x91, 0x91, 0x6e}, // 3
-  {0x0f, 0x10, 0x10, 0x10, 0xff}, // 4
-  {0x4e, 0x91, 0x91, 0x91, 0x61}, // 5
-  {0x7e, 0x91, 0x91, 0x91, 0x62}, // 6
-  {0x06, 0x01, 0x01, 0x01, 0xff}, // 7
-  {0x76, 0x89, 0x89, 0x89, 0x76}, // 8
-  {0x46, 0x89, 0x89, 0x89, 0x7e}, // 9
-  {0x00, 0x00, 0x36, 0x00, 0x00}  // :
+  // 32: пробел
+  {0x00, 0x00, 0x00, 0x00, 0x00},
+  // 33: !
+  {0x00, 0x00, 0x58, 0x00, 0x00},
+  // 34: "
+  {0x00, 0x00, 0x00, 0x00, 0x00},
+  // 35: #
+  {0x00, 0x28, 0x7E, 0x28, 0x00},
+  // 36: $
+  {0x00, 0x24, 0x5E, 0x52, 0x00},
+  // 37: %
+  {0x00, 0x60, 0x50, 0x23, 0x00},
+  // 38: &
+  {0x00, 0x36, 0x49, 0x26, 0x00},
+  // 39: '
+  {0x00, 0x40, 0x40, 0x00, 0x00},
+  // 40: (
+  {0x00, 0x3C, 0x40, 0x3C, 0x00},
+  // 41: )
+  {0x00, 0x3C, 0x04, 0x3C, 0x00},
+  // 42: *
+  {0x00, 0x14, 0x3E, 0x14, 0x00},
+  // 43: +
+  {0x00, 0x08, 0x3E, 0x08, 0x00},
+  // 44: ,
+  {0x00, 0x00, 0x00, 0x40, 0x40},
+  // 45: -
+  {0x00, 0x00, 0x08, 0x08, 0x00},
+  // 46: .
+  {0x00, 0x00, 0x00, 0x00, 0x60},
+  // 47: /
+  {0x00, 0x20, 0x10, 0x08, 0x04},
+  // 48: 0
+  {0x7e, 0x81, 0x81, 0x81, 0x7e},
+  // 49: 1
+  {0x00, 0x84, 0x82, 0xff, 0x80},
+  // 50: 2
+  {0xe2, 0x91, 0x91, 0x91, 0x8e},
+  // 51: 3
+  {0x42, 0x91, 0x91, 0x91, 0x6e},
+  // 52: 4
+  {0x0f, 0x10, 0x10, 0x10, 0xff},
+  // 53: 5
+  {0x4e, 0x91, 0x91, 0x91, 0x61},
+  // 54: 6
+  {0x7e, 0x91, 0x91, 0x91, 0x62},
+  // 55: 7
+  {0x06, 0x01, 0x01, 0x01, 0xff},
+  // 56: 8
+  {0x76, 0x89, 0x89, 0x89, 0x76},
+  // 57: 9
+  {0x46, 0x89, 0x89, 0x89, 0x7e},
+  // 58: :
+  {0x00, 0x00, 0x36, 0x00, 0x00},
+  // 59: ;
+  {0x00, 0x00, 0x36, 0x00, 0x00},
+  // 60: <
+  {0x00, 0x00, 0x1C, 0x22, 0x41},
+  // 61: =
+  {0x00, 0x00, 0x3E, 0x3E, 0x00},
+  // 62: >
+  {0x00, 0x00, 0x41, 0x22, 0x1C},
+  // 63: ?
+  {0x00, 0x00, 0x55, 0x05, 0x02},
+  // 64: @
+  {0x00, 0x3C, 0x42, 0x5D, 0x5C},
+  // 65: A
+  {0xfe, 0x21, 0x21, 0x21, 0xfe},
+  // 66: B
+  {0xff, 0x91, 0x91, 0x91, 0x76},
+  // 67: C
+  {0x7e, 0x81, 0x81, 0x81, 0xc3},
+  // 68: D
+  {0xff, 0x81, 0x81, 0x81, 0x7e},
+  // 69: E
+  {0xff, 0x91, 0x91, 0x91, 0x81},
+  // 70: F
+  {0xff, 0x11, 0x11, 0x11, 0x01},
+  // 71: G
+  {0x7e, 0x81, 0x91, 0x91, 0x72},
+  // 72: H
+  {0xff, 0x10, 0x10, 0x10, 0xff},
+  // 73: I
+  {0x81, 0x81, 0xff, 0x81, 0x81},
+  // 74: J
+  {0x61, 0x81, 0x81, 0x81, 0x7f},
+  // 75: K
+  {0xff, 0x08, 0x08, 0x14, 0xe3},
+  // 76: L
+  {0xff, 0x80, 0x80, 0x80, 0x80},
+  // 77: M
+  {0xff, 0x0e, 0x70, 0x0e, 0xff},
+  // 78: N
+  {0xff, 0x0e, 0x38, 0xe0, 0xff},
+  // 79: O
+  {0x7e, 0x81, 0x81, 0x81, 0x7e},
+  // 80: P
+  {0xff, 0x11, 0x11, 0x11, 0x0e},
+  // 81: Q
+  {0x7e, 0x81, 0xa1, 0xc1, 0xfe},
+  // 82: R
+  {0xff, 0x09, 0x09, 0x09, 0xf6},
+  // 83: S
+  {0x4e, 0x91, 0x91, 0x91, 0x62},
+  // 84: T
+  {0x03, 0x01, 0xff, 0x01, 0x03},
+  // 85: U
+  {0x7f, 0x80, 0x80, 0x80, 0x7f},
+  // 86: V
+  {0x0f, 0x70, 0x80, 0x70, 0x0f},
+  // 87: W
+  {0x3f, 0x40, 0xfe, 0x40, 0x3f},
+  // 88: X
+  {0xc7, 0x28, 0x10, 0x28, 0xc7},
+  // 89: Y
+  {0x0f, 0x10, 0xf0, 0x10, 0x0f},
+  // 90: Z
+  {0xe1, 0x91, 0x89, 0x85, 0x87}
 };
 
 // ============ Шрифт 5x8 — кириллица ============
@@ -155,7 +245,7 @@ const byte cyrillic_5x8[][5] PROGMEM = {
   {0xff, 0x80, 0xff, 0x80, 0xff}, // Ш  24
   {0x7f, 0x40, 0x7f, 0x40, 0xff}, // Щ  25
   {0xff, 0x88, 0x88, 0x70, 0xff}, // Э  26
-  {0xff, 0x88, 0x88, 0x70, 0xff}, // Ю  27
+  {0xff, 0x10, 0x7e, 0x81, 0x7e}, // Ю  27
   {0xc6, 0x39, 0x09, 0x09, 0xff}, // Я  28
   {0xfe, 0x93, 0x92, 0x93, 0x82}, // Ё  29
   {0x42, 0x91, 0x91, 0x91, 0x7e}, // Ы  30
@@ -172,9 +262,9 @@ int XY(int x, int y) {
   return tile * 64 + pos;
 }
 
-// ============ Отрисовка символа ============
+// ============ Отрисовка латиницы ============
 void drawChar(char c, int x, uint32_t color) {
-  if (c < 32 || c > 126) return;
+  if (c < 32 || c > 90) return;
   int idx = c - 32;
   for (int col = 0; col < 5; col++) {
     byte bits = pgm_read_byte(&font5x8[idx][col]);
@@ -190,7 +280,7 @@ void drawChar(char c, int x, uint32_t color) {
   }
 }
 
-// ============ Отрисовка кириллического символа ============
+// ============ Отрисовка кириллицы ============
 void drawCyrillicCharByIndex(int idx, int x, uint32_t color) {
   if (idx < 0 || idx >= 33) return;
   for (int col = 0; col < 5; col++) {
@@ -207,7 +297,7 @@ void drawCyrillicCharByIndex(int idx, int x, uint32_t color) {
   }
 }
 
-// ============ Определение кириллицы ============
+// ============ Определение символа ============
 int getCyrillicIndex(const char* str, size_t i) {
   if (i >= strlen(str) - 1) return -1;
   unsigned char c1 = str[i];
@@ -215,7 +305,6 @@ int getCyrillicIndex(const char* str, size_t i) {
   int idx = -1;
 
   if (c1 == 0xD0) {
-    Serial.printf("UTF-8: %02X %02X → ", c1, c2);  // Добавьте это
     switch (c2) {
       case 0x90: idx = 0;  break;  // А
       case 0x91: idx = 1;  break;  // Б
@@ -243,38 +332,50 @@ int getCyrillicIndex(const char* str, size_t i) {
       case 0xA7: idx = 23; break;  // Ч
       case 0xA8: idx = 24; break;  // Ш
       case 0xA9: idx = 25; break;  // Щ
-      case 0xAA: idx = 26; break;  // Э
-      case 0xAB: idx = 27; break;  // Ю
+      case 0xAA: idx = 32; break;  // Ъ
+      case 0xAB: idx = 30; break;  // Ы
       case 0xAC: idx = 31; break;  // Ь
-      case 0xAD: idx = 30; break;  // Ы
-      case 0xAE: idx = 32; break;  // Ъ
+      case 0xAD: idx = 26; break;  // Э
+      case 0xAE: idx = 27; break;  // Ю
       case 0xAF: idx = 28; break;  // Я
       case 0x81: idx = 29; break;  // Ё
     }
-    Serial.println(idx);  // И это
   }
   return idx;
 }
 
-// ============ Ширина текста ============
+// ============ Ширина текста (только видимые символы) ============
 int getTextWidth(const char* text) {
   if (text == nullptr || strlen(text) == 0) return 0;
   int width = 0;
   size_t i = 0;
   size_t len = strlen(text);
+  bool hasVisible = false;
+
   while (i < len) {
     int idx = getCyrillicIndex(text, i);
-    if (idx != -1) { width += 6; i += 2; } else { width += 6; i++; }
+    if (idx != -1) {
+      width += 6;
+      i += 2;
+      hasVisible = true;
+    } else if (text[i] >= 32 && text[i] <= 90 && text[i] != ' ') {
+      width += 6;
+      i++;
+      hasVisible = true;
+    } else {
+      i++;
+    }
   }
-  return width;
+
+  return hasVisible ? width : 0;
 }
 
-// ============ Отображение текста ============
+// ============ Показ текста ============
 void showTextFrame() {
   strip.clear();
   const char* text = lines[currentLineIndex];
   uint32_t color = strip.Color(reds[currentLineIndex], greens[currentLineIndex], blues[currentLineIndex]);
-  if (color == 0 && strlen(text) > 0) color = strip.Color(255, 180, 50);
+  if (color == 0 && getTextWidth(text) > 0) color = strip.Color(255, 180, 50);
   int x = -textOffset;
   size_t i = 0;
   size_t len = strlen(text);
@@ -311,25 +412,23 @@ void fadeIn() {
 
 // ============ Загрузка из EEPROM ============
 void loadTextSettings() {
-  Serial.println("📂 Загружаем настройки из EEPROM...");
+  Serial.println("📂 Загрузка настроек...");
   EEPROM.begin(EEPROM_SIZE);
   int addr = SETTINGS_ADDR;
   for (int i = 0; i < NUM_LINES; i++) {
     int len = EEPROM.read(addr++);
     if (len > MAX_TEXT_LEN) len = MAX_TEXT_LEN;
     for (int j = 0; j < len; j++) {
-      lines[i][j] = EEPROM.read(addr);
-      addr++;
+      lines[i][j] = EEPROM.read(addr++);
     }
     lines[i][len] = '\0';
-    Serial.printf("  строка %d: '%s'\n", i, lines[i]);
+    Serial.printf("  Строка %d: '%s'\n", i, lines[i]);
   }
   addr = COLOR_ADDR;
   for (int i = 0; i < NUM_LINES; i++) {
     reds[i] = EEPROM.read(addr++);
     greens[i] = EEPROM.read(addr++);
     blues[i] = EEPROM.read(addr++);
-    Serial.printf("  цвет %d: %d, %d, %d\n", i, reds[i], greens[i], blues[i]);
   }
   brightness = EEPROM.read(BRIGHTNESS_ADDR);
   if (brightness == 0 || brightness > 255) brightness = BRIGHTNESS;
@@ -339,7 +438,7 @@ void loadTextSettings() {
   if (SCROLL_DELAY == 0 || SCROLL_DELAY > 500) SCROLL_DELAY = DEFAULT_SCROLL_DELAY;
   EEPROM.end();
   for (int i = 0; i < NUM_LINES; i++) {
-    if (reds[i] == 0 && greens[i] == 0 && blues[i] == 0 && strlen(lines[i]) > 0) {
+    if (reds[i] == 0 && greens[i] == 0 && blues[i] == 0 && getTextWidth(lines[i]) > 0) {
       reds[i] = 255; greens[i] = 180; blues[i] = 50;
     }
   }
@@ -348,13 +447,15 @@ void loadTextSettings() {
 
 // ============ Сохранение в EEPROM ============
 void saveTextSettings() {
-  Serial.println("📝 Сохраняем настройки в EEPROM...");
+  Serial.println("💾 Сохранение строк:");
+  for (int i = 0; i < NUM_LINES; i++) {
+    Serial.printf("  %d: '%s'\n", i, lines[i]);
+  }
   EEPROM.begin(EEPROM_SIZE);
   int addr = SETTINGS_ADDR;
   for (int i = 0; i < NUM_LINES; i++) {
     size_t len = strlen(lines[i]);
     EEPROM.write(addr++, len);
-    Serial.printf("  строка %d: длина=%d, текст='%s'\n", i, len, lines[i]);
     for (size_t j = 0; j < len; j++) {
       EEPROM.write(addr++, lines[i][j]);
     }
@@ -364,7 +465,6 @@ void saveTextSettings() {
     EEPROM.write(addr++, reds[i]);
     EEPROM.write(addr++, greens[i]);
     EEPROM.write(addr++, blues[i]);
-    Serial.printf("  цвет %d: %d, %d, %d\n", i, reds[i], greens[i], blues[i]);
   }
   EEPROM.write(BRIGHTNESS_ADDR, brightness);
   EEPROM.write(SPEED_ADDR, (uint8_t)SCROLL_DELAY);
@@ -373,7 +473,7 @@ void saveTextSettings() {
   Serial.println("✅ EEPROM: сохранено");
 }
 
-// ============ Wi-Fi ============
+// ============ Wi-Fi и веб-интерфейс ============
 bool loadWiFiSettings() {
   EEPROM.begin(EEPROM_SIZE);
   if (EEPROM.read(WIFI_FLAG_ADDR) != 1) {
@@ -415,8 +515,7 @@ void handleWiFiSelect() {
   if (n == -2) html += "<option>Сканирование...</option>";
   else if (n == 0) html += "<option>Нет сетей</option>";
   else for (int i = 0; i < n; i++) html += "<option>" + WiFi.SSID(i) + "</option>";
-  html += "</select><br><input type='password' name='pass' placeholder='Пароль'><br>";
-  html += "<button>Подключиться</button></form>";
+  html += "</select><br><input type='password' name='pass' placeholder='Пароль'><br><button>Подключиться</button></form>";
   server.send(200, "text/html", html);
 }
 
@@ -433,7 +532,6 @@ void handleSaveWiFi() {
   }
 }
 
-// ============ Веб-интерфейс ============
 void handleRoot() {
   server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   server.sendHeader("Pragma", "no-cache");
@@ -466,7 +564,7 @@ void handleRoot() {
   html += "</div>";
 
   html += "<div class='section'>";
-  html += "<label>⏱️ Скорость (мин. 5)</label><br>";
+  html += "<label>⏱️ Скорость (5–500 мс)</label><br>";
   html += "<input type='range' id='speed' min='5' max='500' value='" + String(SCROLL_DELAY) + "' onchange='updateVal(\"sVal\", this.value)'>";
   html += " <span id='sVal'>" + String(SCROLL_DELAY) + "</span><br>";
   html += "<button onclick='saveSpeed()'>Сохранить</button>";
@@ -485,113 +583,106 @@ void handleRoot() {
     html += "B <input type='range' min='0' max='255' value='" + String(blues[i]) + "' id='b" + String(i+1) + "' onchange='updateVal(\"b" + String(i+1) + "v\", this.value)'>";
     html += " <span id='b" + String(i+1) + "v'>" + String(blues[i]) + "</span><br>";
     html += "<button onclick='saveLine(" + String(i+1) + ")'>Сохранить</button>";
-    html += "<div id='msg" + String(i+1) + "' class='msg'></div>";
+    html += "<div id='lMsg" + String(i+1) + "' class='msg'></div>";
     html += "</div>";
   }
 
   html += "<script>";
-  html += "function updateVal(id, val) { document.getElementById(id).textContent = val; }";
-  html += "function saveBrightness() { let b = document.getElementById('brightness').value; fetch('/save-brightness?b=' + b); document.getElementById('bMsg').innerHTML = '✔️ Сохранено'; }";
-  html += "function saveSpeed() { let s = document.getElementById('speed').value; fetch('/save-speed?s=' + s); document.getElementById('sMsg').innerHTML = '✔️ Сохранено'; }";
-  html += "function saveLine(num) {";
-  html += "  let form = new FormData();";
-  html += "  form.append('num', num);";
-  html += "  form.append('text', document.getElementById('line'+num).value);";
-  html += "  form.append('r', document.getElementById('r'+num).value);";
-  html += "  form.append('g', document.getElementById('g'+num).value);";
-  html += "  form.append('b', document.getElementById('b'+num).value);";
-  html += "  fetch('/save-line', { method: 'POST', body: form });";
-  html += "  document.getElementById('msg'+num).innerHTML = '✔️ Сохранено';";
+  html += "function updateVal(id, val) { document.getElementById(id).innerText = val; }";
+  html += "function saveBrightness() {";
+  html += "  let v = document.getElementById('brightness').value;";
+  html += "  fetch('/save-brightness?v=' + v)";
+  html += "    .then(r => { document.getElementById('bMsg').innerText = '✅'; setTimeout(() => { document.getElementById('bMsg').innerText = ''; }, 2000); });";
   html += "}";
-  html += "</script>";
+  html += "function saveSpeed() {";
+  html += "  let v = document.getElementById('speed').value;";
+  html += "  fetch('/save-speed?v=' + v)";
+  html += "    .then(r => { document.getElementById('sMsg').innerText = '✅'; setTimeout(() => { document.getElementById('sMsg').innerText = ''; }, 2000); });";
+  html += "}";
+  html += "function saveLine(num) {";
+  html += "  let line = document.getElementById('line'+num).value;";
+  html += "  let r = document.getElementById('r'+num).value;";
+  html += "  let g = document.getElementById('g'+num).value;";
+  html += "  let b = document.getElementById('b'+num).value;";
+  html += "  let form = new FormData();";
+  html += "  form.append('num', num-1);";
+  html += "  form.append('text', line);";
+  html += "  form.append('r', r);";
+  html += "  form.append('g', g);";
+  html += "  form.append('b', b);";
+  html += "  fetch('/save-line', { method: 'POST', body: form })";
+  html += "    .then(r => {";
+  html += "      document.getElementById('lMsg'+num).innerText = '✅';";
+  html += "      setTimeout(() => { document.getElementById('lMsg'+num).innerText = ''; }, 2000);";
+  html += "    });";
+  html += "}";
+  html += "</script></body></html>";
 
-  html += "</body></html>";
   server.send(200, "text/html", html);
 }
 
-// ============ Обработчики ============
 void handleSaveBrightness() {
-  if (server.hasArg("b")) {
-    int b = server.arg("b").toInt();
-    if (b >= 0 && b <= 255) {
-      brightness = b;
-      strip.setBrightness(brightness);
-      currentBrightness = brightness;
-      saveTextSettings();
-    }
+  if (server.hasArg("v")) {
+    brightness = server.arg("v").toInt();
+    if (brightness < 0) brightness = 0;
+    if (brightness > 255) brightness = 255;
+    strip.setBrightness(brightness);
+    currentBrightness = brightness;
+    EEPROM.begin(EEPROM_SIZE);
+    EEPROM.write(BRIGHTNESS_ADDR, brightness);
+    EEPROM.commit();
+    EEPROM.end();
   }
-  server.send(200, "text/plain", "OK");
+  server.send(200, "text/plain", "ok");
 }
 
 void handleSaveSpeed() {
-  if (server.hasArg("s")) {
-    int s = server.arg("s").toInt();
-    if (s >= 5 && s <= 500) {
-      SCROLL_DELAY = s;
-      saveTextSettings();
-    }
+  if (server.hasArg("v")) {
+    SCROLL_DELAY = server.arg("v").toInt();
+    if (SCROLL_DELAY < 5) SCROLL_DELAY = 5;
+    if (SCROLL_DELAY > 500) SCROLL_DELAY = 500;
+    EEPROM.begin(EEPROM_SIZE);
+    EEPROM.write(SPEED_ADDR, SCROLL_DELAY);
+    EEPROM.commit();
+    EEPROM.end();
   }
-  server.send(200, "text/plain", "OK");
+  server.send(200, "text/plain", "ok");
 }
 
 void handleSaveLine() {
-  Serial.println("📥 ЗАПРОС: /save-line (POST)");
-
   if (server.hasArg("num") && server.hasArg("text")) {
-    Serial.printf("  num: %s\n", server.arg("num").c_str());
-    Serial.printf("  text: '%s'\n", server.arg("text").c_str());
-    Serial.printf("  r: %s, g: %s, b: %s\n",
-      server.hasArg("r") ? server.arg("r").c_str() : "-",
-      server.hasArg("g") ? server.arg("g").c_str() : "-",
-      server.hasArg("b") ? server.arg("b").c_str() : "-"
-    );
-
-    int num = server.arg("num").toInt() - 1;
+    int num = server.arg("num").toInt();
     if (num >= 0 && num < NUM_LINES) {
       String text = server.arg("text");
       if (text.length() > MAX_TEXT_LEN) text = text.substring(0, MAX_TEXT_LEN);
       text.toCharArray(lines[num], MAX_TEXT_LEN + 1);
 
-      Serial.printf("✅ Сохраняем строку %d: '%s'\n", num, lines[num]);
-
-      int r = server.hasArg("r") ? server.arg("r").toInt() : 0;
-      int g = server.hasArg("g") ? server.arg("g").toInt() : 0;
-      int b = server.hasArg("b") ? server.arg("b").toInt() : 0;
-
-      if (r == 0 && g == 0 && b == 0 && strlen(lines[num]) > 0) {
-        r = 255; g = 180; b = 50;
-      }
-      reds[num] = r; greens[num] = g; blues[num] = b;
+      if (server.hasArg("r")) reds[num] = server.arg("r").toInt();
+      if (server.hasArg("g")) greens[num] = server.arg("g").toInt();
+      if (server.hasArg("b")) blues[num] = server.arg("b").toInt();
 
       saveTextSettings();
-      Serial.printf("🎨 Цвет: %d, %d, %d\n", r, g, b);
-    } else {
-      Serial.printf("❌ Неверный номер строки: %d\n", num + 1);
     }
-  } else {
-    Serial.println("❌ Аргументы num или text не получены");
-    if (server.hasArg("num")) Serial.println("  num: есть");
-    if (server.hasArg("text")) Serial.println("  text: есть");
-    else Serial.println("  text: отсутствует!");
   }
-  server.send(200, "text/plain", "OK");
+  server.send(200, "text/plain", "ok");
 }
 
-// ============ setup и loop ============
+// ============ SETUP ============
 void setup() {
   Serial.begin(115200);
   strip.begin();
+  strip.setBrightness(brightness);
   strip.show();
 
+  EEPROM.begin(EEPROM_SIZE);
   loadTextSettings();
-  Serial.println("\n🌐 ИНИЦИАЛИЗАЦИЯ Wi-Fi...");
-  localIP = IPAddress(0, 0, 0, 0);
-  shouldServeWiFi = false;
+  EEPROM.end();
+
   bool connected = false;
 
-   // 1. Подключение к сохранённой сети
+  // 1. Подключение к сохранённой сети
   if (loadWiFiSettings()) {
-    Serial.printf("🔐 Подключаемся к сохранённой сети: %s\n", savedSSID);
+    Serial.printf("🔐 Подключаемся к сохранённой: %s\n", savedSSID);
     WiFi.mode(WIFI_STA);
     WiFi.begin(savedSSID, savedPass);
     unsigned long start = millis();
@@ -604,13 +695,13 @@ void setup() {
       Serial.println("\n✅ Подключено: " + localIP.toString());
       connected = true;
     } else {
-      Serial.println("\n❌ Не удалось подключиться: " + String(savedSSID));
+      Serial.println("\n❌ Не удалось: " + String(savedSSID));
     }
   }
 
-  // 2. Подключение к известным сетям
+  // 2. Попытка подключиться к известным сетям
   if (!connected) {
-    Serial.println("🔍 Пытаемся подключиться к Root_HOME / Root_home");
+    Serial.println("🔍 Попытка подключиться к Root_HOME / Root_home");
     WiFi.mode(WIFI_STA);
     for (int i = 0; i < NUM_KNOWN_SSIDS; i++) {
       const char* ssid = KNOWN_SSIDS[i];
@@ -635,9 +726,9 @@ void setup() {
     }
   }
 
-  // 3. Запуск точки доступа, если ни к одной сети не подключились
+  // 3. Запуск точки доступа
   if (!connected) {
-    Serial.println("🔧 Ни одна сеть не найдена. Запускаем точку доступа.");
+    Serial.println("🔧 Ни одной сети. Запускаем точку доступа.");
     WiFi.mode(WIFI_AP);
     WiFi.softAP(AP_SSID, AP_PASS);
     localIP = WiFi.softAPIP();
@@ -648,7 +739,7 @@ void setup() {
     Serial.println("🔑 Пароль: " + String(AP_PASS));
   }
 
-  // === Запуск веб-сервера ===
+  // Настройка сервера
   server.on("/", HTTP_GET, handleRoot);
   server.on("/save-brightness", HTTP_GET, handleSaveBrightness);
   server.on("/save-speed", HTTP_GET, handleSaveSpeed);
@@ -661,13 +752,15 @@ void setup() {
 
   server.begin();
 
+  // Инициализация анимации
   textOffset = -SCREEN_WIDTH;
   currentBrightness = brightness;
 
-  Serial.println("\n🚀 Устройство готово!");
-  Serial.println("🌐 Открой в браузере: http://" + localIP.toString());
+  Serial.println("\n🚀 Бегущая строка запущена!");
+  Serial.println("🌐 Откройте в браузере: http://" + localIP.toString());
 }
 
+// ============ LOOP ============
 void loop() {
   server.handleClient();
 
@@ -678,7 +771,7 @@ void loop() {
         showTextFrame();
         textOffset++;
         int width = getTextWidth(lines[currentLineIndex]);
-        if (textOffset > width + 2) {
+        if (width > 0 && textOffset > width + 2) {
           displayState = FADE_OUT;
           lastChange = now;
         }
@@ -698,12 +791,14 @@ void loop() {
     }
 
     case CHANGE_LINE: {
+      Serial.printf("🔄 Переход: строка %d", currentLineIndex);
       currentLineIndex = (currentLineIndex + 1) % NUM_LINES;
       int attempts = 0;
-      while (strlen(lines[currentLineIndex]) == 0 && attempts < NUM_LINES) {
+      while (getTextWidth(lines[currentLineIndex]) == 0 && attempts < NUM_LINES) {
         currentLineIndex = (currentLineIndex + 1) % NUM_LINES;
         attempts++;
       }
+      Serial.printf(" → %d\n", currentLineIndex);
       textOffset = -SCREEN_WIDTH;
       displayState = FADE_IN;
       lastChange = now;
